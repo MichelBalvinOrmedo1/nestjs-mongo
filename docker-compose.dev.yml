@@ -1,0 +1,53 @@
+version: '3.9'
+
+services:
+  app:
+    container_name: name-app-dev
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - ${PORT}:${PORT}
+    volumes:
+      - ./src:/app/src # Evita conflictos con node_modules del contenedor y del host
+
+    env_file:
+      - .env
+
+    environment:
+      MONGO_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_HOST: name-mongodb-dev
+      MONGO_PORT: ${MONGO_PORT}
+      MONGO_DB_NAME: ${MONGO_DB_NAME}
+
+    depends_on:
+      - name-mongodb-dev
+    networks:
+      - name-mongodb-network-dev
+
+  name-mongodb-dev:
+    image: mongo:latest
+    restart: unless-stopped
+    container_name: name-mongodb-dev
+    ports:
+      - 27017:${MONGO_PORT}
+    volumes:
+      - name-mongodb_data:/data/db
+      - name-mongodb_logs:/var/log/mongodb
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+
+    networks:
+      - name-mongodb-network-dev
+
+networks:
+  name-mongodb-network-dev:
+    driver: bridge
+
+volumes:
+  name-mongodb_data:
+  name-mongodb_logs:

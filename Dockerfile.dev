@@ -1,0 +1,24 @@
+# Etapa base: Usamos node:20-alpine
+FROM node:22-alpine     
+
+
+# Configuración del entorno
+ENV DIR=/app
+WORKDIR $DIR
+
+
+RUN apk update && apk add --no-cache dumb-init=1.2.5-r3 && npm install -g pnpm@9.15.2 
+
+COPY package.json pnpm-lock.yaml ./
+# Instalar dependencias
+ARG NPM_TOKEN
+RUN echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ".npmrc" && \
+    pnpm install --no-frozen-lockfile && \
+    rm -f .npmrc
+    
+# Copiar archivos de configuración y código fuente
+COPY tsconfig*.json .swcrc nest-cli.json nodemon.json ./
+COPY src src
+EXPOSE 3000
+
+CMD ["pnpm", "start:swc"]

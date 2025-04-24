@@ -1,0 +1,89 @@
+version: '3.9'
+services:
+  weaviate:
+    container_name: weaviate
+    image: semitechnologies/weaviate:1.24.3
+    restart: always
+    ports:
+      - '9000:8080' # Se cambia el puerto expuesto al host
+      - '50051:50051'
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      ENABLE_MODULES: 'text2vec-openai'
+      DEFAULT_VECTORIZER_MODULE: 'text2vec-openai'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - mongodb-network-prd
+
+  app:
+    container_name: wsp-app
+    env_file:
+      - .env
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile.prd
+    ports:
+      - ${PORT}:${PORT}
+    environment:
+      MONGO_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_HOST: mongodb-prd
+      MONGO_PORT: ${MONGO_PORT}
+      MONGO_DB_NAME: ${MONGO_DB_NAME}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - mongodb-prd
+      - redis
+      - weaviate
+    networks:
+      - mongodb-network-prd
+    entrypoint:
+      [
+        'sh',
+        '-c',
+        "until nc -z -v -w30 mongodb-prd 27017 && nc -z -v -w30 weaviate 8080; do echo 'Waiting for MongoDB & Weaviate...'; sleep 2; done; node dist/main",
+      ]
+
+  mongodb-prd:
+    container_name: mongodb-prd
+    restart: always
+    image: mongo:latest
+    ports:
+      - 27017:27017
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_logs:/var/log/mongodb
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    networks:
+      - mongodb-network-prd
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - 6379:6379
+    networks:
+      - mongodb-network-prd
+
+    depends_on:
+      - mongodb-prd
+
+    command: ['redis-server', '--appendonly', 'yes']
+
+networks:
+  mongodb-network-prd:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  mongodb_logs:
+  weaviate_data:

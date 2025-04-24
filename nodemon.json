@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": "ts,tsx,js,json",
+  "exec": "nest start --watch",
+  "legacyWatch": true
+}
